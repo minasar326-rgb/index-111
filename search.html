@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>بحث عن طالب - نظام حضور الطلاب</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <i class="fas fa-user-graduate"></i>
+        <h2>نظام الحضور</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item"><i class="fas fa-home"></i><span>Dashboard</span></a>
+        <a href="/add-student" class="nav-item"><i class="fas fa-user-plus"></i><span>إضافة طالب</span></a>
+        <a href="/attendance" class="nav-item"><i class="fas fa-check-circle"></i><span>تسجيل الحضور</span></a>
+        <a href="/search" class="nav-item active"><i class="fas fa-search"></i><span>بحث عن طالب</span></a>
+        <a href="/reports" class="nav-item"><i class="fas fa-file-alt"></i><span>التقارير</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>تسجيل الخروج</span></button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1>بحث عن طالب</h1>
+        <p>ابحث عن طالب بالاسم أو الكود</p>
+      </div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-search"></i> البحث</h2>
+        </div>
+        
+        <form id="searchForm">
+          <div class="form-group">
+            <label>البحث (الاسم أو الكود)</label>
+            <input type="text" id="searchQuery" placeholder="أدخل اسم الطالب أو الكود" required>
+          </div>
+          
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i>
+            بحث
+          </button>
+        </form>
+      </div>
+
+      <div id="searchResult"></div>
+    </main>
+  </div>
+
+  <script>
+    if (!localStorage.getItem('adminToken')) { window.location.href = '/'; }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUsername');
+      window.location.href = '/';
+    }
+
+    document.getElementById('searchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const query = document.getElementById('searchQuery').value;
+      const resultDiv = document.getElementById('searchResult');
+      
+      resultDiv.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin"></i> جاري البحث...</div>';
+      
+      try {
+        const res = await fetch(`/api/students/search/${query}`);
+        const data = await res.json();
+        
+        if (data.success) {
+          const { student, stats, records } = data.data;
+          resultDiv.innerHTML = `
+            <div class="content-card">
+              <div class="card-header">
+                <h2><i class="fas fa-user"></i> بيانات الطالب</h2>
+              </div>
+              <div class="student-profile">
+                <div class="profile-avatar"><i class="fas fa-user"></i></div>
+                <div class="profile-info">
+                  <h3>${student.name}</h3>
+                  <p>كود الطالب: ${student.code}</p>
+                </div>
+              </div>
+              
+              <div class="stats-grid" style="margin-top: 20px;">
+                <div class="stat-card">
+                  <div class="icon green"><i class="fas fa-check"></i></div>
+                  <h3>عدد الحضور</h3>
+                  <div class="number">${stats.present}</div>
+                </div>
+                <div class="stat-card">
+                  <div class="icon red"><i class="fas fa-times"></i></div>
+                  <h3>عدد الغياب</h3>
+                  <div class="number">${stats.absent}</div>
+                </div>
+                <div class="stat-card">
+                  <div class="icon blue"><i class="fas fa-percentage"></i></div>
+                  <h3>نسبة الحضور</h3>
+                  <div class="number">${stats.percentage}%</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="content-card" style="margin-top: 20px;">
+              <div class="card-header">
+                <h2><i class="fas fa-list"></i> سجل الحضور</h2>
+              </div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>اليوم</th>
+                      <th>الجزء</th>
+                      <th>التاريخ</th>
+                      <th>الوقت</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${records.length > 0 ? records.map(r => `
+                      <tr>
+                        <td>${r.day}</td>
+                        <td>${r.partName}</td>
+                        <td>${r.date}</td>
+                        <td>${r.time}</td>
+                        <td><span class="status-badge ${r.status}">${r.status === 'present' ? 'حاضر' : 'غائب'}</span></td>
+                      </tr>
+                    `).join('') : '<tr><td colspan="5" style="text-align:center;">لا يوجد سجل</td></tr>'}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        } else {
+          resultDiv.innerHTML = `
+            <div class="content-card">
+              <div class="alert alert-danger" style="text-align:center;">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>${data.message}</span>
+              </div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i><span>حدث خطأ</span></div>';
+      }
+    });
+  </script>
+</body>
+</html>
+

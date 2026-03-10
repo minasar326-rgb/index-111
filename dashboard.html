@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة التحكم - نظام حضور الطلاب</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <i class="fas fa-user-graduate"></i>
+        <h2>نظام الحضور</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item active"><i class="fas fa-home"></i><span>Dashboard</span></a>
+        <a href="/add-student" class="nav-item"><i class="fas fa-user-plus"></i><span>إضافة طالب</span></a>
+        <a href="/attendance" class="nav-item"><i class="fas fa-check-circle"></i><span>تسجيل الحضور</span></a>
+        <a href="/search" class="nav-item"><i class="fas fa-search"></i><span>بحث عن طالب</span></a>
+        <a href="/reports" class="nav-item"><i class="fas fa-file-alt"></i><span>التقارير</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>تسجيل الخروج</span></button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1>لوحة التحكم</h1>
+        <p>مرحباً بك في نظام إدارة حضور الطلاب</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="icon blue"><i class="fas fa-users"></i></div>
+          <h3>إجمالي الطلاب</h3>
+          <div class="number" id="totalStudents">0</div>
+          <div class="sub-text">طالب مسجل</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="icon green"><i class="fas fa-check"></i></div>
+          <h3>الحضور اليوم</h3>
+          <div class="number" id="todayPresent">0</div>
+          <div class="sub-text">حاضر</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="icon red"><i class="fas fa-times"></i></div>
+          <h3>الغياب اليوم</h3>
+          <div class="number" id="todayAbsent">0</div>
+          <div class="sub-text">غائب</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="icon purple"><i class="fas fa-calendar-day"></i></div>
+          <h3>اليوم</h3>
+          <div class="number" id="currentDay">-</div>
+          <div class="sub-text" id="dayStatus">جاري التحقق</div>
+        </div>
+      </div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-list"></i> حضور اليوم</h2>
+        </div>
+        
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>اسم الطالب</th>
+                <th>كود الطالب</th>
+                <th>اليوم</th>
+                <th>الجزء</th>
+                <th>التاريخ</th>
+                <th>الوقت</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="todayTable">
+              <tr><td colspan="7" style="text-align: center; color: #6B7280;">جاري تحميل البيانات...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!localStorage.getItem('adminToken')) { window.location.href = '/'; }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUsername');
+      window.location.href = '/';
+    }
+
+    async function loadDashboard() {
+      try {
+        const statsRes = await fetch('/api/attendance/stats');
+        const stats = await statsRes.json();
+        
+        if (stats.success) {
+          document.getElementById('totalStudents').textContent = stats.data.totalStudents || 0;
+          document.getElementById('todayPresent').textContent = stats.data.todayPresent || 0;
+          document.getElementById('todayAbsent').textContent = stats.data.todayAbsent || 0;
+          document.getElementById('currentDay').textContent = stats.data.dayName || '-';
+          document.getElementById('dayStatus').textContent = stats.data.isValidDay ? 'مسموح' : 'غير مسموح';
+        }
+
+        const todayRes = await fetch('/api/attendance/today');
+        const todayData = await todayRes.json();
+        
+        const tbody = document.getElementById('todayTable');
+        
+        if (todayData.success && todayData.data.records && todayData.data.records.length > 0) {
+          tbody.innerHTML = todayData.data.records.map(record => `
+            <tr>
+              <td>${record.studentName}</td>
+              <td>${record.studentCode}</td>
+              <td>${record.day}</td>
+              <td>${record.partName}</td>
+              <td>${record.date}</td>
+              <td>${record.time}</td>
+              <td><span class="status-badge ${record.status}">${record.status === 'present' ? 'حاضر' : 'غائب'}</span></td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #6B7280;">لا يوجد حضور اليوم</td></tr>`;
+        }
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
+

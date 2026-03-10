@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الحضور - نظام حضور الطلاب</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <i class="fas fa-user-graduate"></i>
+        <h2>نظام الحضور</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item"><i class="fas fa-home"></i><span>Dashboard</span></a>
+        <a href="/add-student" class="nav-item"><i class="fas fa-user-plus"></i><span>إضافة طالب</span></a>
+        <a href="/attendance" class="nav-item active"><i class="fas fa-check-circle"></i><span>تسجيل الحضور</span></a>
+        <a href="/search" class="nav-item"><i class="fas fa-search"></i><span>بحث عن طالب</span></a>
+        <a href="/reports" class="nav-item"><i class="fas fa-file-alt"></i><span>التقارير</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>تسجيل الخروج</span></button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1>تسجيل الحضور</h1>
+        <p>سجل حضور الطلاب باستخدام كود الطالب</p>
+      </div>
+
+      <div id="dayStatusMessage"></div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-check-circle"></i> تسجيل الحضور بالكود</h2>
+        </div>
+        
+        <form id="attendanceForm" class="attendance-form">
+          <div class="parts-selection" id="partsSection">
+            <div class="part-option selected" data-value="1" onclick="selectPart('1')">
+              <i class="fas fa-pray"></i>
+              <h4>تسبحة + محاضرة 1</h4>
+            </div>
+            <div class="part-option" data-value="2" onclick="selectPart('2')">
+              <i class="fas fa-church"></i>
+              <h4>قداس + محاضرة 2</h4>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>كود الطالب</label>
+            <input type="text" id="studentCode" placeholder="أدخل كود الطالب (مثال: 1001)" required autofocus>
+          </div>
+          
+          <button type="submit" class="btn btn-success" id="submitBtn">
+            <i class="fas fa-check"></i>
+            تسجيل الحضور
+          </button>
+        </form>
+
+        <div id="attendanceResult" class="attendance-result"></div>
+      </div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-list"></i> حضور اليوم</h2>
+        </div>
+        
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>اسم الطالب</th>
+                <th>كود الطالب</th>
+                <th>الجزء</th>
+                <th>الوقت</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="attendanceTable">
+              <tr><td colspan="5" style="text-align: center; color: #6B7280;">جاري تحميل البيانات...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let selectedPart = '1';
+
+    if (!localStorage.getItem('adminToken')) { window.location.href = '/'; }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUsername');
+      window.location.href = '/';
+    }
+
+    function selectPart(part) {
+      selectedPart = part;
+      document.querySelectorAll('.part-option').forEach(el => el.classList.remove('selected'));
+      document.querySelector(`.part-option[data-value="${part}"]`).classList.add('selected');
+    }
+
+    async function checkDayStatus() {
+      try {
+        const res = await fetch('/api/attendance/stats');
+        const data = await res.json();
+        
+        const statusDiv = document.getElementById('dayStatusMessage');
+        const form = document.getElementById('attendanceForm');
+        
+        if (!data.success || !data.data.isValidDay) {
+          statusDiv.innerHTML = `
+            <div class="day-not-allowed">
+              <i class="fas fa-calendar-xmark"></i>
+              <h2>لا يمكن تسجيل الحضور اليوم</h2>
+              <p>أيام التسجيل المسموحة: الخميس والجمعة فقط</p>
+            </div>
+          `;
+          form.style.display = 'none';
+        } else {
+          statusDiv.innerHTML = `
+            <div class="alert alert-info" style="margin-bottom: 20px;">
+              <i class="fas fa-info-circle"></i>
+              <span>اليوم: ${data.data.dayName} - يمكنك تسجيل الحضور</span>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const code = document.getElementById('studentCode').value;
+      const resultDiv = document.getElementById('attendanceResult');
+      const submitBtn = document.getElementById('submitBtn');
+      
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التسجيل...';
+      
+      try {
+        const res = await fetch('/api/attendance/mark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code, part: selectedPart })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          playSuccessSound();
+          resultDiv.className = 'attendance-result show success';
+          resultDiv.innerHTML = `
+            <div class="student-info">
+              <div class="student-avatar"><i class="fas fa-user"></i></div>
+              <div class="student-details">
+                <h3>${data.data.studentName}</h3>
+                <p>كود الطالب: ${data.data.studentCode}</p>
+                <p>التاريخ: ${data.data.date} - الوقت: ${data.data.time}</p>
+                <p>الجزء: ${data.data.partName}</p>
+              </div>
+            </div>
+          `;
+          document.getElementById('studentCode').value = '';
+          loadAttendance();
+        } else {
+          resultDiv.className = 'attendance-result show error';
+          resultDiv.innerHTML = `
+            <div class="student-info">
+              <div class="student-avatar" style="background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+              <div class="student-details">
+                <h3>خطأ</h3>
+                <p>${data.message}</p>
+              </div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+      
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fas fa-check"></i> تسجيل الحضور';
+      
+      setTimeout(() => { resultDiv.classList.remove('show'); }, 5000);
+    });
+
+    function playSuccessSound() {
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+      } catch (e) { console.log('Audio not supported'); }
+    }
+
+    async function loadAttendance() {
+      try {
+        const res = await fetch('/api/attendance/today');
+        const data = await res.json();
+        const tbody = document.getElementById('attendanceTable');
+        
+        if (data.success && data.data.records && data.data.records.length > 0) {
+          tbody.innerHTML = data.data.records.map(record => `
+            <tr>
+              <td>${record.studentName}</td>
+              <td>${record.studentCode}</td>
+              <td>${record.partName}</td>
+              <td>${record.time}</td>
+              <td><span class="status-badge ${record.status}">${record.status === 'present' ? 'حاضر' : 'غائب'}</span></td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #6B7280;">لا يوجد حضور اليوم</td></tr>`;
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    checkDayStatus();
+    loadAttendance();
+  </script>
+</body>
+</html>
+

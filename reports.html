@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التقارير - نظام حضور الطلاب</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <i class="fas fa-user-graduate"></i>
+        <h2>نظام الحضور</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item"><i class="fas fa-home"></i><span>Dashboard</span></a>
+        <a href="/add-student" class="nav-item"><i class="fas fa-user-plus"></i><span>إضافة طالب</span></a>
+        <a href="/attendance" class="nav-item"><i class="fas fa-check-circle"></i><span>تسجيل الحضور</span></a>
+        <a href="/search" class="nav-item"><i class="fas fa-search"></i><span>بحث عن طالب</span></a>
+        <a href="/reports" class="nav-item active"><i class="fas fa-file-alt"></i><span>التقارير</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>تسجيل الخروج</span></button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1>التقارير</h1>
+        <p>استخرج تقارير الحضور والغياب</p>
+      </div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-file-export"></i> تصدير التقرير</h2>
+        </div>
+        
+        <div class="export-options">
+          <div class="form-group">
+            <label>اختر الأسبوع</label>
+            <select id="weekSelect">
+              <option value="">جميع الأسابيع</option>
+            </select>
+          </div>
+          
+          <button class="btn btn-primary" onclick="exportReport()">
+            <i class="fas fa-file-word"></i>
+            تصدير إلى Word/HTML
+          </button>
+        </div>
+      </div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-chart-bar"></i> إحصائيات الغياب</h2>
+        </div>
+        
+        <div id="absentStats"></div>
+      </div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-history"></i> سجل الحضور الكامل</h2>
+        </div>
+        
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>اسم الطالب</th>
+                <th>الكود</th>
+                <th>اليوم</th>
+                <th>الجزء</th>
+                <th>التاريخ</th>
+                <th>الوقت</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="allAttendance">
+              <tr><td colspan="7" style="text-align: center; color: #6B7280;">جاري تحميل البيانات...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!localStorage.getItem('adminToken')) { window.location.href = '/'; }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUsername');
+      window.location.href = '/';
+    }
+
+    async function loadWeeks() {
+      try {
+        const res = await fetch('/api/reports/weeks');
+        const data = await res.json();
+        
+        const select = document.getElementById('weekSelect');
+        if (data.success && data.data.length > 0) {
+          data.data.forEach(week => {
+            const option = document.createElement('option');
+            option.value = week;
+            option.textContent = `الأسبوع ${week}`;
+            select.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    async function loadAbsenceStats() {
+      try {
+        const res = await fetch('/api/attendance/stats');
+        const data = await res.json();
+        const statsDiv = document.getElementById('absentStats');
+        
+        if (data.success && data.data.mostAbsent && data.data.mostAbsent.length > 0) {
+          statsDiv.innerHTML = data.data.mostAbsent.map((student, index) => `
+            <div class="absence-item">
+              <div class="absence-rank">${index + 1}</div>
+              <div class="absence-info">
+                <h4>${student.name}</h4>
+                <p>كود: ${student.code}</p>
+              </div>
+              <div class="absence-count">
+                <span class="count">${student.count}</span>
+                <span class="label">غياب</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          statsDiv.innerHTML = '<p style="text-align:center;color:#6B7280;">لا توجد إحصائيات</p>';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    async function loadAllAttendance() {
+      try {
+        const res = await fetch('/api/reports/all');
+        const data = await res.json();
+        const tbody = document.getElementById('allAttendance');
+        
+        if (data.success && data.data.length > 0) {
+          tbody.innerHTML = data.data.map(record => `
+            <tr>
+              <td>${record.studentName}</td>
+              <td>${record.studentCode}</td>
+              <td>${record.day}</td>
+              <td>${record.partName || (record.part === '1' ? 'تسبحة + محاضرة 1' : 'قداس + محاضرة 2')}</td>
+              <td>${record.date}</td>
+              <td>${record.time}</td>
+              <td><span class="status-badge ${record.status}">${record.status === 'present' ? 'حاضر' : 'غائب'}</span></td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #6B7280;">لا يوجد بيانات</td></tr>';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    function exportReport() {
+      const week = document.getElementById('weekSelect').value;
+      const url = week ? `/api/reports/word?week=${week}` : '/api/reports/word';
+      window.open(url, '_blank');
+    }
+
+    loadWeeks();
+    loadAbsenceStats();
+    loadAllAttendance();
+  </script>
+</body>
+</html>
+

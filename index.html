@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الدخول - نظام حضور الطلاب</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <div class="login-logo">
+        <i class="fas fa-user-graduate"></i>
+        <h1>نظام حضور الطلاب</h1>
+        <p>تسجيل الدخول للأدمن</p>
+      </div>
+      
+      <form id="loginForm">
+        <div class="form-group">
+          <label>اسم المستخدم</label>
+          <input type="text" id="username" placeholder="أدخل اسم المستخدم" required>
+        </div>
+        
+        <div class="form-group">
+          <label>كلمة المرور</label>
+          <input type="password" id="password" placeholder="أدخل كلمة المرور" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-sign-in-alt"></i>
+          تسجيل الدخول
+        </button>
+      </form>
+      
+      <div id="errorMessage" class="alert alert-danger" style="display: none; margin-top: 20px;">
+        <i class="fas fa-exclamation-circle"></i>
+        <span id="errorText"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check if already logged in
+    if (localStorage.getItem('adminToken')) {
+      window.location.href = '/dashboard';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorDiv = document.getElementById('errorMessage');
+      const errorText = document.getElementById('errorText');
+      
+      // Simple client-side check (in production, use server-side auth)
+      if (username === 'admin' && password === 'admin123') {
+        localStorage.setItem('adminToken', 'true');
+        localStorage.setItem('adminUsername', username);
+        window.location.href = '/dashboard';
+      } else {
+        errorDiv.style.display = 'flex';
+        errorText.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+      }
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إضافة طالب - نظام حضور الطلاب</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <i class="fas fa-user-graduate"></i>
+        <h2>نظام الحضور</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item"><i class="fas fa-home"></i><span>Dashboard</span></a>
+        <a href="/add-student" class="nav-item active"><i class="fas fa-user-plus"></i><span>إضافة طالب</span></a>
+        <a href="/attendance" class="nav-item"><i class="fas fa-check-circle"></i><span>تسجيل الحضور</span></a>
+        <a href="/search" class="nav-item"><i class="fas fa-search"></i><span>بحث عن طالب</span></a>
+        <a href="/reports" class="nav-item"><i class="fas fa-file-alt"></i><span>التقارير</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>تسجيل الخروج</span></button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1>إضافة طالب جديد</h1>
+        <p>أضف طلاب جدد للنظام</p>
+      </div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-user-plus"></i> بيانات الطالب</h2>
+        </div>
+        
+        <form id="addStudentForm">
+          <div class="form-group">
+            <label>اسم الطالب</label>
+            <input type="text" id="studentName" placeholder="أدخل اسم الطالب" required>
+          </div>
+          
+          <div class="form-group">
+            <label>كود الطالب</label>
+            <input type="text" id="studentCode" placeholder="أدخل كود الطالب (مثال: 1001)" required>
+          </div>
+          
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            إضافة الطالب
+          </button>
+        </form>
+
+        <div id="resultMessage"></div>
+      </div>
+
+      <div class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-users"></i> قائمة الطلاب</h2>
+        </div>
+        
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>اسم الطالب</th>
+                <th>كود الطالب</th>
+                <th>تاريخ الإضافة</th>
+                <th>حذف</th>
+              </tr>
+            </thead>
+            <tbody id="studentsTable">
+              <tr><td colspan="4" style="text-align: center; color: #6B7280;">جاري تحميل البيانات...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!localStorage.getItem('adminToken')) { window.location.href = '/'; }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUsername');
+      window.location.href = '/';
+    }
+
+    document.getElementById('addStudentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('studentName').value;
+      const code = document.getElementById('studentCode').value;
+      const resultDiv = document.getElementById('resultMessage');
+      
+      try {
+        const res = await fetch('/api/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, code })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          resultDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i><span>تم إضافة الطالب بنجاح</span></div>';
+          document.getElementById('addStudentForm').reset();
+          loadStudents();
+        } else {
+          resultDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i><span>${data.message}</span></div>`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i><span>حدث خطأ</span></div>';
+      }
+      
+      setTimeout(() => { resultDiv.innerHTML = ''; }, 3000);
+    });
+
+    async function loadStudents() {
+      try {
+        const res = await fetch('/api/students');
+        const data = await res.json();
+        const tbody = document.getElementById('studentsTable');
+        
+        if (data.success && data.data.length > 0) {
+          tbody.innerHTML = data.data.map(student => `
+            <tr>
+              <td>${student.name}</td>
+              <td>${student.code}</td>
+              <td>${new Date(student.createdAt).toLocaleDateString('ar-EG')}</td>
+              <td><button class="btn-delete" onclick="deleteStudent('${student._id}')"><i class="fas fa-trash"></i></button></td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #6B7280;">لا يوجد طلاب</td></tr>';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    async function deleteStudent(id) {
+      if (!confirm('هل أنت متأكد من حذف هذا الطالب؟')) return;
+      
+      try {
+        const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (data.success) {
+          loadStudents();
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    loadStudents();
+  </script>
+</body>
+</html>
+
